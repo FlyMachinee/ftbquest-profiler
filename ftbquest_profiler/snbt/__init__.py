@@ -1,3 +1,3 @@
-from .snbt import SNBT, SNBTList
+from .snbt import SNBT, SNBTList, SNBTArray
 
-__all__ = ["SNBT", "SNBTList"]
+__all__ = ["SNBT", "SNBTList", "SNBTArray"]
