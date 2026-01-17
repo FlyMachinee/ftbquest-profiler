@@ -200,10 +200,12 @@ class SNBT(dict[str, SNBTValue]):
                 stream.write(sep_start + inner_indent_str)
             else:
                 stream.write(sep_mid + inner_indent_str)
+
             if set(key) & set(":."):
                 stream.write(f'"{key}": ')
             else:
                 stream.write(f"{key}: ")
+
             if isinstance(value, SNBT):
                 if key == "item" and not "tag" in value:
                     value.pretty(
@@ -219,7 +221,33 @@ class SNBT(dict[str, SNBTValue]):
                         indent=indent,
                         indent_level=indent_level + 1,
                     )
-            elif isinstance(value, (SNBTList, SNBTArray)):
+            elif isinstance(value, SNBTList):
+                if indent_level == 0 and (
+                    key == "chapter_groups" or key == "rewards"
+                ):
+                    stream.write("[")
+                    for j, item in enumerate(value):
+                        if j == 0:
+                            stream.write(sep_start + inner_indent_str + indent)
+                        else:
+                            stream.write(sep_mid + inner_indent_str + indent)
+
+                        assert isinstance(item, SNBT)
+                        item.pretty(
+                            stream=stream,
+                            seps=(" ", ", ", " "),
+                            indent="",
+                            indent_level=0,
+                        )
+                    stream.write(sep_end + inner_indent_str + "]")
+                else:
+                    value.pretty(
+                        stream=stream,
+                        seps=seps,
+                        indent=indent,
+                        indent_level=indent_level + 1,
+                    )
+            elif isinstance(value, SNBTArray):
                 value.pretty(
                     stream=stream,
                     seps=seps,
