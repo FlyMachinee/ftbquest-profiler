@@ -60,7 +60,7 @@ class Long(Number):
         return super().__new__(cls, value)
 
     def __repr__(self) -> str:
-        return f"{int(self)}l"
+        return f"{int(self)}L"
 
     def __str__(self) -> str:
-        return f"{int(self)}l"
+        return f"{int(self)}L"

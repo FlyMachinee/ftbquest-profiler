@@ -1,4 +1,6 @@
 class String(str):
     def __str__(self) -> str:
-        escaped = self.replace("\\", "\\\\").replace('"', '\\"')
-        return f'"{escaped}"'
+        return f'"{super().__str__()}"'
+
+    def __repr__(self) -> str:
+        return f"String({super().__repr__()})"
