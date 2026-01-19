@@ -12,6 +12,9 @@ class LangForest:
     def __setitem__(self, lang_code: str, tree: LangTree) -> None:
         self.trees[lang_code] = tree
 
+    def contains(self, lang_code: str) -> bool:
+        return lang_code in self.trees
+
     def from_lang_dir(
         self, lang_dir: str, namespace: str | None = "ftbquests"
     ) -> None:
