@@ -22,6 +22,9 @@ class SNBTParser:
         self.lexer.input_file(file)
         return self.parser.parse(lexer=self.lexer.lexer)
 
+    def restart(self) -> None:
+        self.parser.restart()
+
     start = "snbt"
 
     def p_snbt(self, p):
