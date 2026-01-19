@@ -26,9 +26,12 @@ class LangForest:
                 self.trees[lang_code] = tree
 
     def to_lang_dir(
-        self, lang_dir: str, namespace: str | None = "ftbquests"
+        self,
+        lang_dir: str,
+        namespace: str | None = "ftbquests",
+        sort: bool = True,
     ) -> None:
         if not os.path.exists(lang_dir):
             os.makedirs(lang_dir)
         for tree in self.trees.values():
-            tree.to_lang_file(lang_dir, namespace)
+            tree.to_lang_file(lang_dir, namespace, sort)

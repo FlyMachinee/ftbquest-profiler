@@ -13,6 +13,7 @@ def main() -> None:
         out_lang_dir=conf.get("lang", "output_directory", fallback=""),
         in_namespace=conf.get("lang", "input_namespace", fallback=""),
         out_namespace=conf.get("lang", "output_namespace", fallback=""),
+        sort_lang=conf.getboolean("lang", "sort", fallback=True),
         logging=conf.getboolean("general", "logging", fallback=True),
     )
     profiler.profile()

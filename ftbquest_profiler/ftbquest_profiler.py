@@ -16,6 +16,7 @@ class FTBQuestProfiler:
         default_lang: str = "zh_cn",
         in_namespace: str = "ftbquests",
         out_namespace: str = "ftbquests",
+        sort_lang: bool = False,
         logging: bool = True,
     ) -> None:
         self.logging = logging
@@ -80,6 +81,7 @@ class FTBQuestProfiler:
         self.out_namespace = out_namespace
 
         self.parser = SNBTParser()
+        self.sort_lang = sort_lang
 
         self.log("FTBQuestProfiler initialized successfully.")
 
@@ -108,7 +110,9 @@ class FTBQuestProfiler:
         self.do_reward_tables()
         self.do_chapters()
 
-        self.lang_forest.to_lang_dir(self.out_lang_dir, self.out_namespace)
+        self.lang_forest.to_lang_dir(
+            self.out_lang_dir, self.out_namespace, sort=self.sort_lang
+        )
         self.log("FTBQuests profiling completed.")
 
     def do_chapters(self) -> None:

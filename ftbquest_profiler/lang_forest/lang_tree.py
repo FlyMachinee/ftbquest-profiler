@@ -46,14 +46,17 @@ class LangTree:
                 self.insert(key[len(namespace) + 1 :], value)
 
     def to_lang_file(
-        self, lang_dir: str, namespace: str | None = "ftbquests"
+        self,
+        lang_dir: str,
+        namespace: str | None = "ftbquests",
+        sort: bool = True,
     ) -> None:
         if not os.path.exists(lang_dir):
             os.makedirs(lang_dir)
         file_path = os.path.join(lang_dir, f"{self.lang_code}.json")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("{\n")
-            for key, value in self.root.walk():
+            for key, value in self.root.walk(sort=sort):
                 if namespace:
                     full_key = f"{namespace}.{key}"
                 else:

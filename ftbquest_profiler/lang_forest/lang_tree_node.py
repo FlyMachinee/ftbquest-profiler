@@ -66,9 +66,15 @@ class LangTreeNode:
         else:
             return key_path in self.children
 
-    def walk(self, prefix: str = ""):
+    def walk(self, prefix: str = "", sort: bool = True):
         if self.value:
             yield prefix, self.value
-        for key, value in self.children.items():
-            full_key = f"{prefix}.{key}" if prefix else key
-            yield from value.walk(full_key)
+        if sort:
+            for key in sorted(self.children.keys()):
+                value = self.children[key]
+                full_key = f"{prefix}.{key}" if prefix else key
+                yield from value.walk(full_key, sort=True)
+        else:
+            for key, value in self.children.items():
+                full_key = f"{prefix}.{key}" if prefix else key
+                yield from value.walk(full_key, sort=False)
