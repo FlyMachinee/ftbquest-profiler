@@ -1,4 +1,3 @@
-from .lang_forest import *
 from .snbt_parser import SNBTParser
 from .snbt import SNBT, SNBTList
 from .snbt.basic_type import *
@@ -98,22 +97,67 @@ class FTBQuestProfiler:
             print("[ERROR]", message)
 
     def profile(self) -> None:
-        if self.in_lang_dir:
-            self.lang_forest = LangForest()
-            self.lang_forest.from_lang_dir(self.in_lang_dir, self.in_namespace)
-        # Ensure default language tree exists
-        if not self.lang_forest.contains(self.default_lang):
-            self.lang_forest[self.default_lang] = LangTree(self.default_lang)
-
+        self.get_langs()
+        self.out_langs: dict[str, dict[str, str]] = dict()
+        for lang_code in self.in_langs:
+            self.out_langs[lang_code] = dict()
         self.do_data()
         self.do_chapter_groups()
         self.do_reward_tables()
         self.do_chapters()
-
-        self.lang_forest.to_lang_dir(
-            self.out_lang_dir, self.out_namespace, sort=self.sort_lang
-        )
+        self.save_langs()
         self.log("FTBQuests profiling completed.")
+
+    def get_langs(self):
+        langs: dict[str, dict[str, str]] = dict()
+        if self.in_lang_dir:
+            for file_name in os.listdir(self.in_lang_dir):
+                if not file_name.endswith(".json"):
+                    self.warn(
+                        f"Non-JSON file '{file_name}' found in lang/. Skipping."
+                    )
+                    continue
+
+                lang_code = file_name[:-5]
+                file_path = os.path.join(self.in_lang_dir, file_name)
+                with open(file_path, "r", encoding="utf-8") as f:
+                    try:
+                        lang_data = json.load(f)
+                    except Exception as e:
+                        self.error(
+                            f"Failed to parse language file '{file_path}': {e}."
+                        )
+                        continue
+                if not isinstance(lang_data, dict):
+                    self.error(
+                        f"Language file '{file_path}' does not contain a valid JSON object. Skipping."
+                    )
+                    continue
+                lang: dict[str, str] = dict()
+                for k, v in lang_data.items():
+                    if not isinstance(v, str):
+                        self.error(
+                            f"Value for key '{k}' in language file '{file_path}' is not a string. Skipping."
+                        )
+                    else:
+                        lang[k] = v
+                langs[lang_code] = lang
+        if self.default_lang not in langs:
+            langs[self.default_lang] = dict()
+        self.in_langs = langs
+
+    def save_langs(self) -> None:
+        langs = self.out_langs
+        for lang_code, lang_data in langs.items():
+            file_path = os.path.join(self.out_lang_dir, f"{lang_code}.json")
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(
+                    lang_data,
+                    f,
+                    ensure_ascii=False,
+                    indent=2,
+                    sort_keys=self.sort_lang,
+                )
 
     def do_chapters(self) -> None:
         pass
@@ -130,6 +174,9 @@ class FTBQuestProfiler:
         # iter all .snbt files in the reward_tables directory
         for file_name in os.listdir(dir_path):
             if not file_name.endswith(".snbt"):
+                self.warn(
+                    f"Non-snbt file '{file_name}' found in reward_tables/. Skipping."
+                )
                 continue
 
             file_path = os.path.join(dir_path, file_name)
@@ -156,18 +203,11 @@ class FTBQuestProfiler:
                 # skip empty title
                 continue
 
-            # test if is a localization key
-            if self.process_if_localization_key(title_string, file_name):
-                continue
+            key = f"{self.out_namespace}.reward_{file_name[:-5]}.title"
+            self.update_out_langs(title_string.raw(), file_name, key)
 
-            # no, process as raw text
-            # generate a new localization key
-            key = f"reward_{file_name[:-5]}.title"
-            # insert into all lang trees
-            for tree in self.lang_forest.trees.values():
-                tree.insert(key, title_string)
             # modify the snbt object
-            snbt_obj["title"] = String(f"{{{self.out_namespace}.{key}}}")
+            snbt_obj["title"] = String(f"{{{key}}}")
             # write back to output directory
             out_file_dir_path = os.path.join(self.out_ftbq_dir, dir_name)
             if not os.path.exists(out_file_dir_path):
@@ -235,20 +275,15 @@ class FTBQuestProfiler:
                 )
                 continue
 
-            # test if is a localization key
-            if self.process_if_localization_key(
-                groups_title, f"{file_name} (group {groups_id})"
-            ):
+            if not groups_title:
+                # skip empty title
                 continue
 
-            # no, process as raw text
-            # generate a new localization key
-            key = f"group_{groups_id.raw()}.title"
-            # insert into all lang trees
-            for tree in self.lang_forest.trees.values():
-                tree.insert(key, groups_title)
+            new_key = f"{self.out_namespace}.group_{groups_id.raw()}.title"
+            self.update_out_langs(groups_title.raw(), file_name, new_key)
+
             # modify the snbt object
-            elem["title"] = String(f"{{{self.out_namespace}.{key}}}")
+            elem["title"] = String(f"{{{new_key}}}")
             # done in this group
 
         # after all groups processed, write back to output directory
@@ -272,7 +307,7 @@ class FTBQuestProfiler:
         except Exception:
             return
 
-        keys_needed = []
+        keys_needed: list[str] = []
 
         if "title" in snbt_obj:
             keys_needed.append("title")
@@ -297,18 +332,11 @@ class FTBQuestProfiler:
                 # skip empty string
                 continue
 
-            # test if is a localization key
-            if self.process_if_localization_key(value, f"{file_name} ({key})"):
-                continue
+            new_key = f"{self.out_namespace}.data.{key}"
+            self.update_out_langs(value.raw(), file_name, new_key)
 
-            # no, process as raw text
-            # generate a new localization key
-            new_key = f"data.{key}"
-            # insert into all lang trees
-            for tree in self.lang_forest.trees.values():
-                tree.insert(new_key, value)
             # modify the snbt object
-            snbt_obj[key] = String(f"{{{self.out_namespace}.{new_key}}}")
+            snbt_obj[key] = String(f"{{{new_key}}}")
             # done in this key
 
         # after all keys processed, write back to output directory
@@ -326,37 +354,32 @@ class FTBQuestProfiler:
                 raise e
         return snbt_obj
 
-    def process_if_localization_key(
-        self, string: String, file_name: str
-    ) -> bool:
-        if string[0] == "{" and string[-1] == "}":
-            # looks like a localization key
-            key = string[1:-1]
-            if key.startswith(self.in_namespace + "."):
-                # extract the actual key
-                key = key[len(self.in_namespace) + 1 :]
-
-                default_tree = self.lang_forest[self.default_lang]
-                # check if the key is in the default lang tree
-                if default_tree.contains(key):
-                    # yes, try copy value to other lang tree if not exist
-                    for (
-                        lang,
-                        tree,
-                    ) in self.lang_forest.trees.items():
-                        if lang == self.default_lang:
-                            continue
-                        if not tree.contains(key):
-                            tree.insert(key, default_tree.at(key))
-                    # all done in this file
-                    return True
-                else:
-                    # no, serve as raw string and warn
-                    self.warn(
-                        f"Localization key '{self.in_namespace}.{key}' in file '{file_name}' not found in '{self.default_lang}.json' lang file. Serving as raw text."
-                    )
+    def update_out_langs(
+        self, str_or_key: str, file_name: str, new_key: str
+    ) -> None:
+        if not str_or_key:
+            return
+        if str_or_key[0] == "{" and str_or_key[-1] == "}":
+            # looks like a key
+            key = str_or_key[1:-1]
+            if key in self.in_langs[self.default_lang]:
+                value = self.in_langs[self.default_lang][key]
             else:
+                # not found, warn and serve as raw text
                 self.warn(
-                    f"Localization key '{key}' in file '{file_name}' does not start with prefix '{self.in_namespace}'. Serving as raw text."
+                    f"Localization key '{key}' in file '{file_name}' not found in '{self.default_lang}.json' lang file. Serving as raw text."
                 )
-        return False
+                value = str_or_key
+            # insert into out_langs
+            for lang_code in self.out_langs:
+                if key in self.in_langs[lang_code]:
+                    self.out_langs[lang_code][new_key] = self.in_langs[
+                        lang_code
+                    ][key]
+                else:
+                    self.out_langs[lang_code][new_key] = value
+        else:
+            # raw text
+            value = str_or_key
+            for lang_code in self.out_langs:
+                self.out_langs[lang_code][new_key] = value
