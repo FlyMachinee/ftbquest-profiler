@@ -176,15 +176,12 @@ class FTBQuestProfiler:
                 continue
 
             if "title" not in snbt_obj:
-                self.info(
-                    f"Reward table '{file_name}' does not have a title. Skipping."
-                )
                 continue
 
             # translate the title
             title_string = snbt_obj["title"]
             if not isinstance(title_string, String):
-                self.warn(
+                self.error(
                     f"Reward table '{file_name}' title is not a string. Skipping."
                 )
                 continue
@@ -254,9 +251,6 @@ class FTBQuestProfiler:
                 continue
 
             if "title" not in elem:
-                self.error(
-                    f"Chapter group '{groups_id}' does not have a 'title' key. Skipping."
-                )
                 continue
             groups_title = elem["title"]
             if not isinstance(groups_title, String):
@@ -305,10 +299,6 @@ class FTBQuestProfiler:
             self.error(f"'{file_name}' does not contain 'title' key. Skipping.")
         if "lock_message" in snbt_obj:
             keys_needed.append("lock_message")
-        else:
-            self.error(
-                f"'{file_name}' does not contain 'lock_message' key. Skipping."
-            )
 
         for key in keys_needed:
             value = snbt_obj[key]
