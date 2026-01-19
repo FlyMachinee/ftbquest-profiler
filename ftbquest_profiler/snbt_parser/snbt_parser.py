@@ -48,7 +48,7 @@ class SNBTParser:
 
     def p_snbt_pair_string_key(self, p):
         """snbt_pair : STRING COLON snbt_value"""
-        p[0] = (str(p[1])[1:-1], p[3])
+        p[0] = (p[1].raw(), p[3])
 
     def p_snbt_pair_num_key(self, p):
         """snbt_pair : INT COLON snbt_value"""
