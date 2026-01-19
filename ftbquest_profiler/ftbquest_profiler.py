@@ -13,7 +13,6 @@ class FTBQuestProfiler:
         out_lang_dir: str,
         in_lang_dir: str = "",
         default_lang: str = "zh_cn",
-        in_namespace: str = "ftbquests",
         out_namespace: str = "ftbquests",
         sort_lang: bool = False,
         logging: bool = True,
@@ -53,15 +52,6 @@ class FTBQuestProfiler:
                 )
             self.in_lang_dir = os.path.abspath(in_lang_dir)
             self.log(f"Input language directory: {self.in_lang_dir}")
-
-        if not in_namespace:
-            in_namespace = "ftbquests"
-            self.log(
-                "Input localization key prefix not specified. Using 'ftbquests'."
-            )
-        else:
-            self.log(f"Input localization key prefix: {in_namespace}")
-        self.in_namespace = in_namespace
 
         if not out_lang_dir:
             raise ValueError("Output language directory is required.")
