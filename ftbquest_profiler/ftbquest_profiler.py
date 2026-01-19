@@ -291,33 +291,25 @@ class FTBQuestProfiler:
         except Exception:
             return
 
-        keys_needed: list[str] = []
+        for key in ["title", "lock_message"]:
+            if key in snbt_obj:
+                value = snbt_obj[key]
+                if not isinstance(value, String):
+                    self.error(
+                        f"'{key}' in '{file_name}' is not a string. Skipping."
+                    )
+                    continue
 
-        if "title" in snbt_obj:
-            keys_needed.append("title")
-        else:
-            self.error(f"'{file_name}' does not contain 'title' key. Skipping.")
-        if "lock_message" in snbt_obj:
-            keys_needed.append("lock_message")
+                if not value:
+                    # skip empty string
+                    continue
 
-        for key in keys_needed:
-            value = snbt_obj[key]
-            if not isinstance(value, String):
-                self.error(
-                    f"'{key}' in '{file_name}' is not a string. Skipping."
-                )
-                continue
+                new_key = f"{self.out_namespace}.data.{key}"
+                self.update_out_langs(value.raw(), file_name, new_key)
 
-            if not value:
-                # skip empty string
-                continue
-
-            new_key = f"{self.out_namespace}.data.{key}"
-            self.update_out_langs(value.raw(), file_name, new_key)
-
-            # modify the snbt object
-            snbt_obj[key] = String(f"{{{new_key}}}")
-            # done in this key
+                # modify the snbt object
+                snbt_obj[key] = String(f"{{{new_key}}}")
+                # done in this key
 
         # after all keys processed, write back to output directory
         out_file_path = os.path.join(self.out_ftbq_dir, file_name)
