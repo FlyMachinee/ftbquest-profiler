@@ -449,14 +449,7 @@ class FTBQuestProfiler:
             if success:
                 # modify the snbt object
                 new_desc_str = json.dumps(json_obj, ensure_ascii=False)
-                escaped_desc_str = (
-                    new_desc_str.replace("\\", "\\\\")
-                    .replace("\n", "\\n")
-                    .replace("\r", "\\r")
-                    .replace("\t", "\\t")
-                    .replace('"', '\\"')
-                )
-                descriptions[i] = String(escaped_desc_str)
+                descriptions[i] = String(new_desc_str)
                 # done in this description
                 counter += 1
                 continue
