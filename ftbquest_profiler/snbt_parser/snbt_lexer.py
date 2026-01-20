@@ -93,7 +93,16 @@ class SNBTLexer:
 
     def t_STRING(self, t):
         r"(\"([^\\\"]|\\.)*\")|(\'([^\\\']|\\.)*\')"
-        t.value = String(t.value[1:-1])
+        decoded_str = (
+            t.value[1:-1]
+            .replace('\\"', '"')
+            .replace("\\'", "'")
+            .replace("\\n", "\n")
+            .replace("\\t", "\t")
+            .replace("\\r", "\r")
+            .replace("\\\\", "\\")
+        )
+        t.value = String(decoded_str)
         return t
 
     def t_newline(self, t):
