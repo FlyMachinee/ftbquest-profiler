@@ -16,6 +16,7 @@ class FTBQuestProfiler:
         out_namespace: str = "ftbquests",
         sort_lang: bool = False,
         logging: bool = True,
+        merge_raw_text: bool = True,
     ) -> None:
         self.logging = logging
 
@@ -71,6 +72,7 @@ class FTBQuestProfiler:
 
         self.parser = SNBTParser()
         self.sort_lang = sort_lang
+        self.merge_raw_text = merge_raw_text
 
         self.log("FTBQuestProfiler initialized successfully.")
 
@@ -179,8 +181,7 @@ class FTBQuestProfiler:
             if not os.path.exists(out_file_dir_path):
                 os.makedirs(out_file_dir_path)
             out_file_path = os.path.join(self.out_ftbq_dir, dir_name, file_name)
-            with open(out_file_path, "w", encoding="utf-8") as dst:
-                snbt_obj.pretty_file(dst)
+            self.snbt_to_file(snbt_obj, out_file_path)
 
     def do_chapter(self, file_name: str, chapter: SNBT) -> None:
         # handle chapter title
@@ -340,112 +341,233 @@ class FTBQuestProfiler:
             )
             return
 
-        counter = 1
-        for i, desc in enumerate(descriptions):
-            if not isinstance(desc, String):
-                self.error(
-                    f"A description entry '{desc}' in quest '{quest_id.raw()}' in chapter '{file_name}' is not a string. Skipping."
-                )
-                continue
-
-            if not desc or desc == "{@pagebreak}":
-                # skip empty description or pagebreak
-                continue
-
-            raw_desc = desc.raw()
-
-            try:
-                json_obj = json.loads(raw_desc)
-                is_json = True
-            except Exception:
-                # not a json
-                json_obj = None
-                is_json = False
-
-            if not is_json:
-                new_key = f"{self.out_namespace}.chapter_{file_name[:-5]}.quest_{quest_id.raw()}.desc_{counter:02d}"
-                self.update_out_langs(raw_desc, file_name, new_key)
-
-                # modify the snbt object
-                descriptions[i] = String(f"{{{new_key}}}")
-                # done in this description
-                counter += 1
-                continue
-
-            # is a json object
-            if not json_obj:
-                # empty json object
-                continue
-
-            def do_json_text(json_obj: dict, rich_num: int) -> bool:
-                if "translate" in json_obj:
-                    rich_text = json_obj["translate"]
-                    if not isinstance(rich_text, str):
-                        self.error(
-                            f"The 'translate' field in description entry '{desc.raw()}' in quest '{quest_id.raw()}' in chapter '{file_name}' is not a string. Skipping."
-                        )
-                        return False
-                    # assume it's a key
-                    rich_text = f"{{{rich_text}}}"
-                elif "text" not in json_obj:
-                    self.warn(
-                        f"A description entry '{desc.raw()}' in quest '{quest_id.raw()}' in chapter '{file_name}' JSON object does not contain 'text'. Skipping."
+        def do_json_text(json_obj: dict, rich_num: int) -> bool:
+            if "translate" in json_obj:
+                rich_text = json_obj["translate"]
+                if not isinstance(rich_text, str):
+                    self.error(
+                        f"The 'translate' field in description entry '{desc.raw()}' in quest '{quest_id.raw()}' in chapter '{file_name}' is not a string. Skipping."
                     )
                     return False
-                else:
-                    rich_text = json_obj["text"]
-                    if not isinstance(rich_text, str):
-                        self.error(
-                            f"The 'text' / 'translate' field in description entry '{desc.raw()}' in quest '{quest_id.raw()}' in chapter '{file_name}' is not a string. Skipping."
-                        )
-                        return False
-
-                if not rich_text:
-                    # skip empty text
+                # assume it's a key
+                rich_text = f"{{{rich_text}}}"
+            elif "text" not in json_obj:
+                self.warn(
+                    f"A description entry '{desc.raw()}' in quest '{quest_id.raw()}' in chapter '{file_name}' JSON object does not contain 'text'. Skipping."
+                )
+                return False
+            else:
+                rich_text = json_obj["text"]
+                if not isinstance(rich_text, str):
+                    self.error(
+                        f"The 'text' / 'translate' field in description entry '{desc.raw()}' in quest '{quest_id.raw()}' in chapter '{file_name}' is not a string. Skipping."
+                    )
                     return False
 
-                new_key = f"{self.out_namespace}.chapter_{file_name[:-5]}.quest_{quest_id.raw()}.desc_{counter:02d}.rich_{rich_num:02d}"
-                self.update_out_langs(rich_text, file_name, new_key)
-                if "text" in json_obj:
-                    del json_obj["text"]
-                json_obj["translate"] = new_key
-                return True
+            if not rich_text:
+                # skip empty text
+                return False
 
-            success = False
-            if isinstance(json_obj, dict):
-                if do_json_text(json_obj, 1):
-                    success = True
-            elif isinstance(json_obj, list):
-                rich_num = 1
-                for j, elem in enumerate(json_obj):
-                    if isinstance(elem, dict):
-                        if do_json_text(elem, rich_num):
-                            rich_num += 1
-                            success = True
-                    elif isinstance(elem, str):
-                        # raw text in array
-                        if not elem:
+            new_key = f"{self.out_namespace}.chapter_{file_name[:-5]}.quest_{quest_id.raw()}.desc_{counter:02d}.rich_{rich_num:02d}"
+            self.update_out_langs(rich_text, file_name, new_key)
+            if "text" in json_obj:
+                del json_obj["text"]
+            json_obj["translate"] = new_key
+            return True
+
+        if self.merge_raw_text:
+            counter = 1
+            descs_to_merge: list[str] = []
+            new_description = SNBTList()
+
+            def flush_merged_descriptions():
+                nonlocal counter
+                if not descs_to_merge:
+                    return
+                merged_text = "\n".join(descs_to_merge)
+                if not merged_text:
+                    descs_to_merge.clear()
+                    return
+                new_key = f"{self.out_namespace}.chapter_{file_name[:-5]}.quest_{quest_id.raw()}.desc_{counter:02d}"
+                self.update_out_langs(merged_text, file_name, new_key)
+                new_description.append(String(f"{{{new_key}}}"))
+                counter += 1
+                descs_to_merge.clear()
+
+            for desc in descriptions:
+                if not isinstance(desc, String):
+                    self.error(
+                        f"A description entry '{desc}' in quest '{quest_id.raw()}' in chapter '{file_name}' is not a string. Skipping."
+                    )
+                    continue
+
+                if not desc:
+                    descs_to_merge.append("")
+                    continue
+
+                if desc == "{@pagebreak}":
+                    # flush merged descriptions
+                    flush_merged_descriptions()
+                    # add pagebreak entry
+                    new_description.append(String("{@pagebreak}"))
+                    continue
+
+                raw_desc = desc.raw()
+
+                try:
+                    json_obj = json.loads(raw_desc)
+                    is_json = True
+                except Exception:
+                    # not a json
+                    json_obj = None
+                    is_json = False
+
+                if not is_json:
+                    # test if it's a key
+                    if raw_desc[0] == "{" and raw_desc[-1] == "}":
+                        key = raw_desc[1:-1]
+                        if key.strip().startswith("image:"):
+                            # serve as image entries
+                            # flush merged descriptions
+                            flush_merged_descriptions()
+                            new_description.append(String(raw_desc))
                             continue
 
-                        new_key = f"{self.out_namespace}.chapter_{file_name[:-5]}.quest_{quest_id.raw()}.desc_{counter:02d}.rich_{rich_num:02d}"
-                        self.update_out_langs(elem, file_name, new_key)
-                        json_obj[j] = {"translate": new_key}
-                        rich_num += 1
-                        success = True
-                if not isinstance(json_obj[0], str):
-                    # insert an empty string at the beginning to avoid issues
-                    json_obj.insert(0, "")
-            else:
-                self.error("Control flow should not reach here.")
-                continue
+                        if key in self.in_langs[self.default_lang]:
+                            value = self.in_langs[self.default_lang][key]
+                        else:
+                            # not found, warn and serve as raw text
+                            self.warn(
+                                f"Localization key '{key}' in file '{file_name}' not found in '{self.default_lang}.json' lang file. Serving as raw text."
+                            )
+                            value = raw_desc
+                    else:
+                        value = raw_desc
 
-            if success:
-                # modify the snbt object
-                new_desc_str = json.dumps(json_obj, ensure_ascii=False)
-                descriptions[i] = String(new_desc_str)
-                # done in this description
-                counter += 1
-                continue
+                    # add to merge list
+                    descs_to_merge.append(value)
+                    continue
+
+                # is a json object
+                flush_merged_descriptions()
+                if not json_obj:
+                    # empty json object
+                    continue
+
+                success = False
+                if isinstance(json_obj, dict):
+                    if do_json_text(json_obj, 1):
+                        success = True
+                elif isinstance(json_obj, list):
+                    rich_num = 1
+                    for j, elem in enumerate(json_obj):
+                        if isinstance(elem, dict):
+                            if do_json_text(elem, rich_num):
+                                rich_num += 1
+                                success = True
+                        elif isinstance(elem, str):
+                            # raw text in array
+                            if not elem:
+                                continue
+
+                            new_key = f"{self.out_namespace}.chapter_{file_name[:-5]}.quest_{quest_id.raw()}.desc_{counter:02d}.rich_{rich_num:02d}"
+                            self.update_out_langs(elem, file_name, new_key)
+                            json_obj[j] = {"translate": new_key}
+                            rich_num += 1
+                            success = True
+                    if not isinstance(json_obj[0], str):
+                        # insert an empty string at the beginning to avoid issues
+                        json_obj.insert(0, "")
+                else:
+                    self.error("Control flow should not reach here.")
+                    continue
+
+                if success:
+                    # modify the snbt object
+                    new_desc_str = json.dumps(json_obj, ensure_ascii=False)
+                    new_description.append(String(new_desc_str))
+                    # done in this description
+                    counter += 1
+                    continue
+
+            # flush remaining merged descriptions
+            flush_merged_descriptions()
+            # replace descriptions
+            quest["description"] = new_description
+
+        else:
+            counter = 1
+            for i, desc in enumerate(descriptions):
+                if not isinstance(desc, String):
+                    self.error(
+                        f"A description entry '{desc}' in quest '{quest_id.raw()}' in chapter '{file_name}' is not a string. Skipping."
+                    )
+                    continue
+
+                if not desc or desc == "{@pagebreak}":
+                    # skip empty description or pagebreak
+                    continue
+
+                raw_desc = desc.raw()
+
+                try:
+                    json_obj = json.loads(raw_desc)
+                    is_json = True
+                except Exception:
+                    # not a json
+                    json_obj = None
+                    is_json = False
+
+                if not is_json:
+                    new_key = f"{self.out_namespace}.chapter_{file_name[:-5]}.quest_{quest_id.raw()}.desc_{counter:02d}"
+                    self.update_out_langs(raw_desc, file_name, new_key)
+
+                    # modify the snbt object
+                    descriptions[i] = String(f"{{{new_key}}}")
+                    # done in this description
+                    counter += 1
+                    continue
+
+                # is a json object
+                if not json_obj:
+                    # empty json object
+                    continue
+
+                success = False
+                if isinstance(json_obj, dict):
+                    if do_json_text(json_obj, 1):
+                        success = True
+                elif isinstance(json_obj, list):
+                    rich_num = 1
+                    for j, elem in enumerate(json_obj):
+                        if isinstance(elem, dict):
+                            if do_json_text(elem, rich_num):
+                                rich_num += 1
+                                success = True
+                        elif isinstance(elem, str):
+                            # raw text in array
+                            if not elem:
+                                continue
+
+                            new_key = f"{self.out_namespace}.chapter_{file_name[:-5]}.quest_{quest_id.raw()}.desc_{counter:02d}.rich_{rich_num:02d}"
+                            self.update_out_langs(elem, file_name, new_key)
+                            json_obj[j] = {"translate": new_key}
+                            rich_num += 1
+                            success = True
+                    if not isinstance(json_obj[0], str):
+                        # insert an empty string at the beginning to avoid issues
+                        json_obj.insert(0, "")
+                else:
+                    self.error("Control flow should not reach here.")
+                    continue
+
+                if success:
+                    # modify the snbt object
+                    new_desc_str = json.dumps(json_obj, ensure_ascii=False)
+                    descriptions[i] = String(new_desc_str)
+                    # done in this description
+                    counter += 1
+                    continue
 
     def do_reward_tables(self) -> None:
         dir_name = "reward_tables"
@@ -495,8 +617,7 @@ class FTBQuestProfiler:
             if not os.path.exists(out_file_dir_path):
                 os.makedirs(out_file_dir_path)
             out_file_path = os.path.join(self.out_ftbq_dir, dir_name, file_name)
-            with open(out_file_path, "w", encoding="utf-8") as dst:
-                snbt_obj.pretty_file(dst)
+            self.snbt_to_file(snbt_obj, out_file_path)
             # done
 
     def do_chapter_groups(self) -> None:
@@ -567,8 +688,7 @@ class FTBQuestProfiler:
 
         # after all groups processed, write back to output directory
         out_file_path = os.path.join(self.out_ftbq_dir, file_name)
-        with open(out_file_path, "w", encoding="utf-8") as dst:
-            snbt_obj.pretty_file(dst)
+        self.snbt_to_file(snbt_obj, out_file_path)
         # done
 
     def do_data(self) -> None:
@@ -608,8 +728,7 @@ class FTBQuestProfiler:
 
         # after all keys processed, write back to output directory
         out_file_path = os.path.join(self.out_ftbq_dir, file_name)
-        with open(out_file_path, "w", encoding="utf-8") as dst:
-            snbt_obj.pretty_file(dst)
+        self.snbt_to_file(snbt_obj, out_file_path)
 
     def file_to_snbt(self, file_path: str) -> SNBT:
         with open(file_path, "r", encoding="utf-8") as src:
@@ -620,6 +739,11 @@ class FTBQuestProfiler:
                 self.parser.restart()
                 raise e
         return snbt_obj
+
+    def snbt_to_file(self, snbt_obj: SNBT, file_path: str) -> None:
+        with open(file_path, "w", encoding="utf-8") as dst:
+            snbt_obj.pretty_file(dst)
+            dst.write("\n")
 
     def update_out_langs(
         self, str_or_key: str, file_name: str, new_key: str

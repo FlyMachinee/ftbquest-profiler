@@ -14,6 +14,9 @@ def main() -> None:
         out_namespace=conf.get("lang", "output_namespace", fallback=""),
         sort_lang=conf.getboolean("lang", "sort", fallback=True),
         logging=conf.getboolean("general", "logging", fallback=True),
+        merge_raw_text=conf.getboolean(
+            "ftbquests", "merge_raw_text", fallback=True
+        ),
     )
     profiler.profile()
 
