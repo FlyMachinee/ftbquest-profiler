@@ -355,14 +355,7 @@ class FTBQuestProfiler:
             raw_desc = desc.raw()
 
             try:
-                decoded_desc = (
-                    raw_desc.replace("\\n", "\n")
-                    .replace("\\r", "\r")
-                    .replace("\\t", "\t")
-                    .replace('\\"', '"')
-                    .replace("\\\\", "\\")
-                )
-                json_obj = json.loads(decoded_desc)
+                json_obj = json.loads(raw_desc)
                 is_json = True
             except Exception:
                 # not a json
