@@ -16,6 +16,7 @@
 - `ftbquests.lang` 你在编写任务时所使用的语言，默认为 `zh_cn`
 - `ftbquests.input_directory` 用于输入的 FTBQuests 目录，目录结构应完全符合 FTBQuests 生成的目录格式；通常为 `{modpack_dir}/config/ftbquests/quests`
 - `ftbquests.output_directory` 用于输出的 FTBQuests 目录；若将值设为与 `ftbquests.input_directory` 相同，将**直接覆盖**原有的文件
+- `ftbquests.merge_raw_text` 是否将 description 部分中的连续多行纯文本字符串合并成一个大字符串以减少翻译键数量，默认为 `True`
 - `lang.input_directory` 用于输入的语言文件目录，若无可留空，通常为 `{modpack_dir}/kubejs/assets/{somename}/lang`
 - `lang.output_directory` 用于输出的语言文件目录；若将值设为与 `lang.input_directory` 相同，将**直接覆盖**原有的文件
 - `lang.out_namespace` 生成的语言文件中翻译键的公共前缀，默认为 `ftbquests`
@@ -45,6 +46,10 @@
 ### 可持续的任务翻译工作
 
 当 `.snbt` 文件被翻译键转化之后，你可以继续在 FTBQuests 的 GUI 中修改任务描述、标题等。只要你提供了修改前的 `.json` 语言文件，`FTBQuestProfiler` 将正确识别你输入的由原始字符串、翻译键所杂糅的 `.snbt` 文件，保留原有翻译键的值，并重新根据先后顺序生成对应的翻译键（强迫症福音）！
+
+### 翻译键合并
+
+当任务描述中存在多行纯文本字符串时，`FTBQuestProfiler` 可以将这些字符串合并为一个大字符串，从而减少翻译键的数量，方便翻译工作者进行翻译。该功能默认开启，但你也可以在 `config.ini` 中关闭该功能以保留每行文本对应一个翻译键的形式。
 
 ## 用例展示
 

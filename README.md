@@ -37,6 +37,10 @@ After `.snbt` files were replaced by localization keys, you can still alter ques
 
 As long as you provide `.json` lang files that before your changes, `FTBQuestProfiler` will correctly recongnize your `.snbt` files (which are mixed in raw texts and localization keys), retain values presented in old lang files, and generate new localization keys according their sequential order! (OCD-friendly!)
 
+### Localization Key Merge
+
+When there are multiple lines of plain text strings in quest descriptions, `FTBQuestProfiler` can merge these strings into one large string, reducing the number of translation keys and making it easier for translators to work. This feature is enabled by default, but you can disable it in `config.ini` to keep each line of text corresponding to a separate translation key.
+
 ## Example
 
 Note: Quest files in following examples are come from Minecraft modpack [Create: The Brass Concerto](https://github.com/Slimeli-32767/CreateTheBrassConcerto>)
